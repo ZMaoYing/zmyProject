@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}回收站 - 学生管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>♻️ 回收站</h2>
+    <div>
+        {% if students %}
+        <form method="POST" action="{{ url_for('clear_recycle') }}" style="display:inline;">
+            <button type="button" class="btn btn-danger" 
+                    onclick="if(confirm('确定要清空回收站吗？所有已删除的学生将被永久删除，此操作不可恢复！')){this.form.submit();}">
+                🗑️ 清空回收站
+            </button>
+        </form>
+        {% endif %}
+        <a href="{{ url_for('student_list') }}" class="btn btn-secondary">← 返回列表</a>
+    </div>
+</div>
+
+<div class="stats-bar">
+    <span>回收站中共 <strong>{{ students|length }}</strong> 条记录</span>
+</div>
+
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>学号</th>
+                <th>姓名</th>
+                <th>年龄</th>
+                <th>性别</th>
+                <th>电话</th>
+                <th>地址</th>
+                <th>删除时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if students %}
+                {% for student in students %}
+                <tr class="deleted-row">
+                    <td>{{ student.id }}</td>
+                    <td><span class="badge">{{ student.student_no }}</span></td>
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.age }}</td>
+                    <td>
+                        {% if student.gender == '男' %}
+                            <span class="gender-male">♂ {{ student.gender }}</span>
+                        {% else %}
+                            <span class="gender-female">♀ {{ student.gender }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ student.phone or '-' }}</td>
+                    <td>{{ student.address or '-' }}</td>
+                    <td>{{ student.deleted_at.strftime('%Y-%m-%d %H:%M') if student.deleted_at else '-' }}</td>
+                    <td class="action-cell">
+                        <form method="POST" action="{{ url_for('restore_student', student_id=student.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-small btn-restore">♻️ 恢复</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('permanent_delete', student_id=student.id) }}" 
+                              style="display:inline;" id="permanent-delete-{{ student.id }}">
+                            <button type="button" class="btn btn-small btn-permanent-delete" 
+                                    onclick="confirmPermanentDelete(document.getElementById('permanent-delete-{{ student.id }}'))">
+                                ❌ 永久删除
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="9" class="empty-data">
+                        回收站为空
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

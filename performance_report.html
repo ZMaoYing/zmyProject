@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学生管理系统 - 查询性能测试报告</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: #f0f2f5;
+            color: #333;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { font-size: 14px; opacity: 0.85; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+
+        /* 概览卡片 */
+        .overview-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+        .card .icon { font-size: 32px; margin-bottom: 10px; }
+        .card .label { font-size: 13px; color: #999; margin-bottom: 6px; }
+        .card .value { font-size: 26px; font-weight: bold; color: #333; }
+        .card .sub { font-size: 12px; color: #aaa; margin-top: 4px; }
+        .card.danger .value { color: #f44336; }
+        .card.warning .value { color: #ff9800; }
+        .card.success .value { color: #4caf50; }
+        .card.info .value { color: #2196f3; }
+
+        /* 区块 */
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .section h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .section h2 span { margin-right: 8px; }
+
+        /* 图表 */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .chart-box {
+            position: relative;
+            height: 320px;
+        }
+
+        /* 数据表格 */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table thead { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .data-table th { padding: 12px 10px; text-align: center; font-weight: 500; font-size: 13px; }
+        .data-table td { padding: 10px; text-align: center; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        .data-table tbody tr:hover { background-color: #f8f9ff; }
+        .highlight { background-color: #fff3e0 !important; font-weight: bold; }
+
+        /* 拐点分析 */
+        .inflection-list { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .inflection-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 18px;
+            position: relative;
+            overflow: hidden;
+        }
+        .inflection-item::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 4px; height: 100%;
+        }
+        .inflection-item.critical::before { background: #f44336; }
+        .inflection-item.warn::before { background: #ff9800; }
+        .inflection-item.normal::before { background: #4caf50; }
+        .inflection-item h3 { font-size: 15px; margin-bottom: 10px; }
+        .inflection-item .detail { font-size: 13px; color: #666; line-height: 1.8; }
+        .inflection-item .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .tag.critical { background: #ffebee; color: #f44336; }
+        .tag.warn { background: #fff3e0; color: #ff9800; }
+        .tag.normal { background: #e8f5e9; color: #4caf50; }
+
+        /* 优化建议 */
+        .suggestion-list { list-style: none; }
+        .suggestion-list li {
+            padding: 14px 18px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .suggestion-list li strong { color: #667eea; }
+
+        /* 环境信息 */
+        .env-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .env-item {
+            background: #f8f9fa;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .env-item .env-label { color: #999; font-size: 12px; }
+        .env-item .env-value { color: #333; font-weight: 500; margin-top: 4px; }
+
+        .footer { text-align: center; padding: 30px; color: #999; font-size: 13px; }
+
+        @media (max-width: 768px) {
+            .overview-cards { grid-template-columns: repeat(2, 1fr); }
+            .chart-grid { grid-template-columns: 1fr; }
+            .inflection-list { grid-template-columns: 1fr; }
+            .env-info { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>📊 学生管理系统 - 查询性能测试报告</h1>
+    <p>测试时间：2026-10-11 15:11:40 &nbsp;|&nbsp; 数据量梯度：100 → 100,000 &nbsp;|&nbsp; 每级重复10次取平均值</p>
+</div>
+
+<div class="container">
+
+    <!-- 概览卡片 -->
+    <div class="overview-cards">
+        <div class="card danger">
+            <div class="icon">⚠️</div>
+            <div class="label">最大响应时间</div>
+            <div class="value">4,741ms</div>
+            <div class="sub">全表查询 @ 10万条</div>
+        </div>
+        <div class="card warning">
+            <div class="icon">🔍</div>
+            <div class="label">全表查询拐点</div>
+            <div class="value">5,000条</div>
+            <div class="sub">响应时间增长8.8倍</div>
+        </div>
+        <div class="card success">
+            <div class="icon">⚡</div>
+            <div class="label">单条查询（最优）</div>
+            <div class="value">0.77ms</div>
+            <div class="sub">主键索引，全程稳定</div>
+        </div>
+        <div class="card info">
+            <div class="icon">📈</div>
+            <div class="label">测试数据总量</div>
+            <div class="value">100,000条</div>
+            <div class="sub">7个梯度级别</div>
+        </div>
+    </div>
+
+    <!-- 测试环境 -->
+    <div class="section">
+        <h2><span>🖥️</span>测试环境</h2>
+        <div class="env-info">
+            <div class="env-item">
+                <div class="env-label">操作系统</div>
+                <div class="env-value">Windows 11 25H2</div>
+            </div>
+            <div class="env-item">
+                <div class="env-label">数据库</div>
+                <div class="env-value">MySQL (本地 127.0.0.1:3306)</div>
+            </div>
+            <div class="env-item">
+                <div class="env-label">Python版本</div>
+                <div class="env-value">Python 3.8.1</div>
+            </div>
+            <div class="env-item">
+                <div class="env-label">数据库驱动</div>
+                <div class="env-value">PyMySQL 1.1.0</div>
+            </div>
+            <div class="env-item">
+                <div class="env-label">Web框架</div>
+                <div class="env-value">Flask 2.2.5</div>
+            </div>
+            <div class="env-item">
+                <div class="env-label">测试方法</div>
+                <div class="env-value">直连DB，每级重复10次取均值</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 性能趋势图 -->
+    <div class="section">
+        <h2><span>📈</span>性能趋势图</h2>
+        <div class="chart-grid">
+            <div class="chart-box"><canvas id="chartFull"></canvas></div>
+            <div class="chart-box"><canvas id="chartKeyword"></canvas></div>
+            <div class="chart-box"><canvas id="chartSingle"></canvas></div>
+            <div class="chart-box"><canvas id="chartCount"></canvas></div>
+        </div>
+    </div>
+
+    <!-- 综合对比图 -->
+    <div class="section">
+        <h2><span>📊</span>四类查询综合对比</h2>
+        <div style="height:400px;">
+            <canvas id="chartCompare"></canvas>
+        </div>
+    </div>
+
+    <!-- 详细数据表 -->
+    <div class="section">
+        <h2><span>📋</span>详细测试数据（单位：毫秒）</h2>
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>数据量</th>
+                        <th colspan="3">全表查询</th>
+                        <th colspan="3">模糊搜索</th>
+                        <th colspan="3">单条查询</th>
+                        <th colspan="3">COUNT统计</th>
+                    </tr>
+                    <tr>
+                        <th></th>
+                        <th>平均</th><th>最小</th><th>最大</th>
+                        <th>平均</th><th>最小</th><th>最大</th>
+                        <th>平均</th><th>最小</th><th>最大</th>
+                        <th>平均</th><th>最小</th><th>最大</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 拐点分析 -->
+    <div class="section">
+        <h2><span>🔬</span>性能拐点分析</h2>
+        <div class="inflection-list">
+            <div class="inflection-item critical">
+                <h3>全表查询 <span class="tag critical">严重</span></h3>
+                <div class="detail">
+                    <strong>拐点：</strong>1,000 → 5,000 条<br>
+                    <strong>数据增长：</strong>5.0 倍<br>
+                    <strong>耗时增长：</strong>8.8 倍（43ms → 381ms）<br>
+                    <strong>10万条：</strong>4,741ms（接近5秒）<br>
+                    <strong>原因：</strong>SELECT * 返回全部字段 + ORDER BY 排序，无分页限制
+                </div>
+            </div>
+            <div class="inflection-item warn">
+                <h3>模糊搜索（LIKE） <span class="tag warn">警告</span></h3>
+                <div class="detail">
+                    <strong>拐点：</strong>10,000 → 50,000 条<br>
+                    <strong>数据增长：</strong>5.0 倍<br>
+                    <strong>耗时增长：</strong>3.3 倍（18.6ms → 60.9ms）<br>
+                    <strong>10万条：</strong>136.7ms<br>
+                    <strong>原因：</strong>LIKE '%keyword%' 无法使用索引，需全表扫描
+                </div>
+            </div>
+            <div class="inflection-item normal">
+                <h3>单条查询（主键） <span class="tag normal">优秀</span></h3>
+                <div class="detail">
+                    <strong>拐点：</strong>无明显拐点<br>
+                    <strong>全程稳定：</strong>0.75ms ~ 0.96ms<br>
+                    <strong>10万条：</strong>0.77ms<br>
+                    <strong>原因：</strong>主键索引直接定位，时间复杂度 O(logN)
+                </div>
+            </div>
+            <div class="inflection-item warn">
+                <h3>COUNT统计 <span class="tag warn">警告</span></h3>
+                <div class="detail">
+                    <strong>拐点：</strong>10,000 → 50,000 条<br>
+                    <strong>数据增长：</strong>5.0 倍<br>
+                    <strong>耗时增长：</strong>5.4 倍（3.5ms → 19.2ms）<br>
+                    <strong>10万条：</strong>26.2ms<br>
+                    <strong>原因：</strong>COUNT(*) 需遍历全表统计行数
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 优化建议 -->
+    <div class="section">
+        <h2><span>💡</span>优化建议</h2>
+        <ul class="suggestion-list">
+            <li>
+                <strong>【高优先级】全表查询加分页：</strong>当前 SELECT * 一次返回全部数据，5000条时已达381ms。
+                建议添加 LIMIT + OFFSET 分页，每页控制在50条以内，可将响应时间降至10ms以下。
+            </li>
+            <li>
+                <strong>【高优先级】避免 SELECT *：</strong>只查询列表需要展示的字段（如 name, student_no, age），
+                减少数据传输量和内存占用。
+            </li>
+            <li>
+                <strong>【中优先级】模糊搜索优化：</strong>LIKE '%keyword%' 无法走索引。建议对 name 和 student_no 
+                添加全文索引（FULLTEXT），或引入 Elasticsearch 实现高效搜索。
+            </li>
+            <li>
+                <strong>【中优先级】COUNT缓存：</strong>学生总数不需要实时计算，可用 Redis 缓存或定时任务更新统计值，
+                避免每次请求都全表扫描。
+            </li>
+            <li>
+                <strong>【低优先级】添加数据库索引：</strong>为 is_deleted 字段添加索引，加速软删除过滤条件：
+                CREATE INDEX idx_is_deleted ON students(is_deleted);
+            </li>
+        </ul>
+    </div>
+
+</div>
+
+<div class="footer">
+    学生管理系统性能测试报告 | 自动生成于 2026-10-11
+</div>
+
+<script>
+// 测试数据
+const data = [
+    { count: 100,    full: { avg: 5.013, min: 4.075, max: 6.28 },      kw: { avg: 1.199, min: 0.827, max: 2.601 },     single: { avg: 0.866, min: 0.71, max: 1.075 },    cnt: { avg: 0.531, min: 0.464, max: 0.687 } },
+    { count: 500,    full: { avg: 22.137, min: 19.434, max: 27.39 },   kw: { avg: 2.324, min: 1.797, max: 3.681 },     single: { avg: 0.957, min: 0.76, max: 1.335 },    cnt: { avg: 0.773, min: 0.591, max: 0.929 } },
+    { count: 1000,   full: { avg: 43.242, min: 37.514, max: 49.032 },  kw: { avg: 2.994, min: 2.355, max: 3.774 },     single: { avg: 0.753, min: 0.553, max: 1.144 },   cnt: { avg: 0.688, min: 0.519, max: 0.871 } },
+    { count: 5000,   full: { avg: 381.137, min: 199.149, max: 1239.844 }, kw: { avg: 9.241, min: 8.012, max: 11.032 },  single: { avg: 0.95, min: 0.753, max: 1.097 },    cnt: { avg: 2.186, min: 1.807, max: 2.975 } },
+    { count: 10000,  full: { avg: 441.314, min: 394.947, max: 536.352 }, kw: { avg: 18.644, min: 17.281, max: 21.379 }, single: { avg: 0.786, min: 0.637, max: 0.915 },   cnt: { avg: 3.542, min: 3.267, max: 4.397 } },
+    { count: 50000,  full: { avg: 2066.86, min: 1792.072, max: 2564.002 }, kw: { avg: 60.946, min: 57.197, max: 66.691 }, single: { avg: 0.775, min: 0.607, max: 0.984 }, cnt: { avg: 19.16, min: 16.548, max: 23.523 } },
+    { count: 100000, full: { avg: 4741.472, min: 4114.426, max: 6243.263 }, kw: { avg: 136.73, min: 121.04, max: 154.079 }, single: { avg: 0.771, min: 0.692, max: 0.839 }, cnt: { avg: 26.242, min: 25.035, max: 27.989 } }
+];
+
+const labels = data.map(d => d.count >= 10000 ? (d.count/10000) + '万' : d.count.toString());
+const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { intersect: false, mode: 'index' },
+    plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, padding: 15 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + 'ms' } }
+    },
+    scales: {
+        x: { title: { display: true, text: '数据量', font: { size: 13 } } },
+        y: { title: { display: true, text: '响应时间 (ms)', font: { size: 13 } }, beginAtZero: true }
+    }
+};
+
+function makeRangeData(d, key) {
+    return {
+        label: 'min-max区间',
+        data: d.map(r => r[key].max - r[key].min),
+        backgroundColor: 'rgba(102,126,234,0.1)',
+        borderColor: 'transparent',
+        type: 'bar',
+        stack: 'range'
+    };
+}
+
+// 全表查询
+new Chart(document.getElementById('chartFull'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            { label: '平均', data: data.map(d => d.full.avg), borderColor: '#f44336', backgroundColor: 'rgba(244,67,54,0.1)', fill: true, tension: 0.3, pointRadius: 5 },
+            { label: '最小', data: data.map(d => d.full.min), borderColor: '#aaa', borderDash: [5,5], pointRadius: 3, tension: 0.3 },
+            { label: '最大', data: data.map(d => d.full.max), borderColor: '#aaa', borderDash: [5,5], pointRadius: 3, tension: 0.3 }
+        ]
+    },
+    options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: '全表查询 (SELECT *)', font: { size: 15 } } } }
+});
+
+// 模糊搜索
+new Chart(document.getElementById('chartKeyword'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            { label: '平均', data: data.map(d => d.kw.avg), borderColor: '#ff9800', backgroundColor: 'rgba(255,152,0,0.1)', fill: true, tension: 0.3, pointRadius: 5 },
+            { label: '最小', data: data.map(d => d.kw.min), borderColor: '#ccc', borderDash: [5,5], pointRadius: 3, tension: 0.3 },
+            { label: '最大', data: data.map(d => d.kw.max), borderColor: '#ccc', borderDash: [5,5], pointRadius: 3, tension: 0.3 }
+        ]
+    },
+    options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: '模糊搜索 (LIKE)', font: { size: 15 } } } }
+});
+
+// 单条查询
+new Chart(document.getElementById('chartSingle'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            { label: '平均', data: data.map(d => d.single.avg), borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,0.1)', fill: true, tension: 0.3, pointRadius: 5 },
+            { label: '最小', data: data.map(d => d.single.min), borderColor: '#ccc', borderDash: [5,5], pointRadius: 3, tension: 0.3 },
+            { label: '最大', data: data.map(d => d.single.max), borderColor: '#ccc', borderDash: [5,5], pointRadius: 3, tension: 0.3 }
+        ]
+    },
+    options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: '单条查询 (主键ID)', font: { size: 15 } } } }
+});
+
+// COUNT
+new Chart(document.getElementById('chartCount'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            { label: '平均', data: data.map(d => d.cnt.avg), borderColor: '#2196f3', backgroundColor: 'rgba(33,150,243,0.1)', fill: true, tension: 0.3, pointRadius: 5 },
+            { label: '最小', data: data.map(d => d.cnt.min), borderColor: '#ccc', borderDash: [5,5], pointRadius: 3, tension: 0.3 },
+            { label: '最大', data: data.map(d => d.cnt.max), borderColor: '#ccc', borderDash: [5,5], pointRadius: 3, tension: 0.3 }
+        ]
+    },
+    options: { ...commonOptions, plugins: { ...commonOptions.plugins, title: { display: true, text: 'COUNT 统计', font: { size: 15 } } } }
+});
+
+// 综合对比图（对数坐标）
+new Chart(document.getElementById('chartCompare'), {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [
+            { label: '全表查询', data: data.map(d => d.full.avg), backgroundColor: 'rgba(244,67,54,0.7)' },
+            { label: '模糊搜索', data: data.map(d => d.kw.avg), backgroundColor: 'rgba(255,152,0,0.7)' },
+            { label: '单条查询', data: data.map(d => d.single.avg), backgroundColor: 'rgba(76,175,80,0.7)' },
+            { label: 'COUNT统计', data: data.map(d => d.cnt.avg), backgroundColor: 'rgba(33,150,243,0.7)' }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            title: { display: true, text: '四类查询平均响应时间对比（ms）', font: { size: 15 } },
+            legend: { position: 'top', labels: { usePointStyle: true, padding: 15 } },
+            tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + 'ms' } }
+        },
+        scales: {
+            x: { title: { display: true, text: '数据量' } },
+            y: { type: 'logarithmic', title: { display: true, text: '响应时间 ms（对数坐标）' } }
+        }
+    }
+});
+
+// 填充数据表格
+const tbody = document.getElementById('dataTableBody');
+data.forEach((d, i) => {
+    const isHighlight = (i === 3); // 5000条拐点行
+    const cls = isHighlight ? ' class="highlight"' : '';
+    const fmt = v => v.toFixed(3);
+    tbody.innerHTML += `<tr${cls}>
+        <td><strong>${d.count.toLocaleString()}条</strong></td>
+        <td>${fmt(d.full.avg)}</td><td>${fmt(d.full.min)}</td><td>${fmt(d.full.max)}</td>
+        <td>${fmt(d.kw.avg)}</td><td>${fmt(d.kw.min)}</td><td>${fmt(d.kw.max)}</td>
+        <td>${fmt(d.single.avg)}</td><td>${fmt(d.single.min)}</td><td>${fmt(d.single.max)}</td>
+        <td>${fmt(d.cnt.avg)}</td><td>${fmt(d.cnt.min)}</td><td>${fmt(d.cnt.max)}</td>
+    </tr>`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}学生列表 - 学生管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📋 学生列表</h2>
+    <a href="{{ url_for('add_student') }}" class="btn btn-primary">➕ 添加学生</a>
+</div>
+
+<!-- 搜索框 -->
+<div class="search-box">
+    <form method="GET" action="{{ url_for('student_list') }}">
+        <input type="text" name="keyword" value="{{ keyword }}" 
+               placeholder="输入姓名、学号或电话搜索..." class="search-input">
+        <button type="submit" class="btn btn-search">🔍 搜索</button>
+        {% if keyword %}
+            <a href="{{ url_for('student_list') }}" class="btn btn-cancel">✖ 清除</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- 统计信息 -->
+<div class="stats-bar">
+    <span>共 <strong>{{ total }}</strong> 条记录，第 <strong>{{ page }}</strong>/{{ total_pages }} 页</span>
+    {% if keyword %}
+        <span>搜索关键词：“{{ keyword }}”</span>
+    {% endif %}
+    <div class="per-page-select">
+        <span>每页显示：</span>
+        {% for n in [10, 20, 50, 100] %}
+            <a href="{{ url_for('student_list', keyword=keyword, page=1, per_page=n) }}"
+               class="per-page-btn {% if per_page == n %}active{% endif %}">{{ n }}</a>
+        {% endfor %}
+        <span>条</span>
+    </div>
+</div>
+
+<!-- 数据表格 -->
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>学号</th>
+                <th>姓名</th>
+                <th>年龄</th>
+                <th>性别</th>
+                <th>电话</th>
+                <th>地址</th>
+                <th>创建时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if students %}
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.id }}</td>
+                    <td><span class="badge">{{ student.student_no }}</span></td>
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.age }}</td>
+                    <td>
+                        {% if student.gender == '男' %}
+                            <span class="gender-male">♂ {{ student.gender }}</span>
+                        {% else %}
+                            <span class="gender-female">♀ {{ student.gender }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ student.phone or '-' }}</td>
+                    <td>{{ student.address or '-' }}</td>
+                    <td>{{ student.created_at.strftime('%Y-%m-%d %H:%M') if student.created_at else '-' }}</td>
+                    <td class="action-cell">
+                        <a href="{{ url_for('edit_student', student_id=student.id) }}" 
+                           class="btn btn-small btn-edit">✏️ 编辑</a>
+                        <form method="POST" action="{{ url_for('delete_student', student_id=student.id) }}" 
+                              style="display:inline;" id="delete-form-{{ student.id }}">
+                            <button type="button" class="btn btn-small btn-delete" 
+                                    onclick="confirmDelete(document.getElementById('delete-form-{{ student.id }}'))">
+                                🗑️ 删除
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="9" class="empty-data">
+                        {% if keyword %}
+                            未找到匹配"{{ keyword }}"的学生记录
+                        {% else %}
+                            暂无学生数据，<a href="{{ url_for('add_student') }}">点击添加</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 分页组件 -->
+{% if total_pages > 1 %}
+<div class="pagination-wrapper">
+    <div class="pagination">
+        <!-- 上一页 -->
+        {% if page > 1 %}
+            <a href="{{ url_for('student_list', keyword=keyword, page=page-1, per_page=per_page) }}" class="page-btn">&laquo; 上一页</a>
+        {% else %}
+            <span class="page-btn disabled">&laquo; 上一页</span>
+        {% endif %}
+
+        <!-- 页码按钮 -->
+        {% set start_page = [1, page - 2]|max %}
+        {% set end_page = [total_pages, page + 2]|min %}
+
+        {% if start_page > 1 %}
+            <a href="{{ url_for('student_list', keyword=keyword, page=1, per_page=per_page) }}" class="page-btn">1</a>
+            {% if start_page > 2 %}
+                <span class="page-ellipsis">...</span>
+            {% endif %}
+        {% endif %}
+
+        {% for p in range(start_page, end_page + 1) %}
+            {% if p == page %}
+                <span class="page-btn active">{{ p }}</span>
+            {% else %}
+                <a href="{{ url_for('student_list', keyword=keyword, page=p, per_page=per_page) }}" class="page-btn">{{ p }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if end_page < total_pages %}
+            {% if end_page < total_pages - 1 %}
+                <span class="page-ellipsis">...</span>
+            {% endif %}
+            <a href="{{ url_for('student_list', keyword=keyword, page=total_pages, per_page=per_page) }}" class="page-btn">{{ total_pages }}</a>
+        {% endif %}
+
+        <!-- 下一页 -->
+        {% if page < total_pages %}
+            <a href="{{ url_for('student_list', keyword=keyword, page=page+1, per_page=per_page) }}" class="page-btn">下一页 &raquo;</a>
+        {% else %}
+            <span class="page-btn disabled">下一页 &raquo;</span>
+        {% endif %}
+    </div>
+
+    <!-- 跳转 -->
+    <div class="page-jump">
+        <span>跳转到</span>
+        <input type="number" id="jumpPage" min="1" max="{{ total_pages }}" value="{{ page }}" class="jump-input">
+        <span>页</span>
+        <button onclick="jumpToPage()" class="btn btn-small btn-search">GO</button>
+    </div>
+</div>
+
+<script>
+function jumpToPage() {
+    var p = document.getElementById('jumpPage').value;
+    if (p >= 1 && p <= {{ total_pages }}) {
+        window.location.href = "{{ url_for('student_list', keyword=keyword, per_page=per_page) }}&page=" + p;
+    }
+}
+</script>
+{% endif %}
+{% endblock %}

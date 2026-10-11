@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}学生管理系统{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">🎓 学生管理系统</div>
+            <div class="nav-links">
+                <a href="{{ url_for('student_list') }}">📋 学生列表</a>
+                <a href="{{ url_for('add_student') }}">➕ 添加学生</a>
+                <a href="{{ url_for('recycle_bin') }}">♻️ 回收站</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                        <span class="close-btn" onclick="this.parentElement.style.display='none'">&times;</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="footer">
+        <p>&copy; 2026 学生管理系统 | Python Flask + MySQL</p>
+    </footer>
+
+    <script>
+        // 3秒后自动关闭提示
+        setTimeout(function() {
+            var alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                alert.style.display = 'none';
+            });
+        }, 3000);
+
+        // 删除确认（软删除，可恢复）
+        function confirmDelete(form) {
+            if (confirm('确定要删除该学生吗？删除后可在回收站恢复。')) {
+                form.submit();
+            }
+        }
+
+        // 永久删除确认
+        function confirmPermanentDelete(form) {
+            if (confirm('⚠️ 确定要永久删除该学生吗？此操作不可恢复！')) {
+                form.submit();
+            }
+        }
+    </script>
+</body>
+</html>
